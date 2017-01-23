@@ -1,0 +1,75 @@
+#!/usr/bin/env bash
+
+set -e
+[ -n "$LANCET_DEBUG" ] && set -x
+
+if [[ -z "$1" ]]; then
+echo "NAME
+   lancet-pull - Integrate upstream commits into a subset repository
+
+SYNOPSIS
+   lancet pull <progenitor-path> [<subset-path>]
+
+OPTIONS
+   <progenitor-path>
+      Path to a directory containing the Git repository from which
+      that within $(tput bold)<subset-path>$(tput sgr0) originated. That is to say, a Git
+      repository within which $(tput bold)lancet clone$(tput sgr0) was run to initially
+      produce the subset repository in $(tput bold)<subset-path>$(tput sgr0).
+
+   <subset-path>
+      Path to a directory containing a Git repository which is a
+      subset of another. That is to say, a Git repository which was
+      created using $(tput bold)lancet clone$(tput sgr0)."
+fi
+
+progenitor_path="$1"
+subset_path="$2"
+
+if [[ -z "$progenitor_path" ]]; then
+  echo "lancet: no progenitor path specified"
+  exit 1
+else
+  progenitor_path=$(realpath "$progenitor_path")
+fi
+
+if [[ -z "$subset_path" ]]; then
+  subset_path=$(pwd)
+else
+  subset_path=$(realpath "$subset_path")
+fi
+
+if [[ ! -e "$progenitor_path" ]]; then
+  echo "lancet: $progenitor_path does not exist"
+  exit 1
+elif [[ ! -e "$subset_path" ]]; then
+  echo "lancet: $subset_path does not exist"
+  exit 1
+elif [[ -e "$progenitor_path" && ! -d "$progenitor_path" ]]; then
+  echo "lancet: $progenitor_path is not a directory"
+  exit 1
+elif [[ -e "$subset_path" && ! -d "$subset_path" ]]; then
+  echo "lancet: $subset_path is not a directory"
+  exit 1
+fi
+
+# Produce a diff of relevant changes from progenitor.
+last_pulled_sha=$(cat .git/lancet)
+relevant_files=$(git ls-tree -r master --name-only)
+
+cd $progenitor_path
+progenitor_diff=$(git diff $last_pulled_sha -- $relevant_files)
+progenitor_sha=$(git rev-parse HEAD)
+
+if [[ -z "$progenitor_diff" ]]; then
+  echo "Already up-to-date."
+else
+  cd $subset_path
+  echo "$progenitor_diff" | patch -p1
+
+  git add .
+  git commit -m "Fast-forwarding to $progenitor_sha"
+
+  # Update the subset's lancet file.
+  echo $progenitor_sha > .git/lancet
+fi

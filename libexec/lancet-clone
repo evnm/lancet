@@ -1,0 +1,65 @@
+#!/usr/bin/env bash
+
+set -e
+[ -n "$LANCET_DEBUG" ] && set -x
+
+if [[ -z "$1" ]]; then
+echo "NAME
+   lancet-clone - Clone a subset of a repository into a new directory
+
+SYNOPSIS
+   lancet clone <output-path> <pathspec>...
+
+OPTIONS
+   -o <output-path>
+      Path to a directory in which a new Git repository will be
+      created to house the cloned subset of the current repository.
+
+   <pathspec>...
+      Files to add content from. Fileglobs (e.g. *.c) can be given to
+      add all matching files. Also a leading directory name (e.g. dir
+      to add dir/file1 and dir/file2) can be given to update the index
+      to match the current state of the directory as a whole
+      (e.g. specifying dir will record not just a file dir/file1
+      modified in the working tree, a file dir/file2 added to the
+      working tree, but also a file dir/file3 removed from the working
+      tree. Note that older versions of Git used to ignore removed
+      files; use --no-all option if you want to add modified or new
+      files but ignore removed ones."
+fi
+
+output_path="$1"
+progenitor_path=$(pwd)
+
+
+
+if [[ -z "$output_path" ]]; then
+  echo "lancet: no output path specified"
+  exit 1
+else
+  output_path=$(realpath "$output_path")
+fi
+
+if [[ -e "$output_path" && ! -d "$output_path" ]]; then
+  echo "lancet: $output_path exists and is not a directory"
+  exit 1
+fi
+
+# Create output directory and copy target files into it.
+shift
+mkdir -p $output_path
+for pathspec in "$@"; do
+  cp -r $pathspec $output_path
+done
+
+cd $output_path
+git init --quiet
+git add .
+git commit -m "Initial commit"
+cd $progenitor_path
+
+# Configure .lancet files within the output and current directories.
+echo $(git rev-parse HEAD) > $output_path/.git/lancet
+echo "$output_path:$(cd $output_path && git rev-parse HEAD)" > .git/lancet
+
+echo "Cloned subset of current Git repository into $output_path"

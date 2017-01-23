@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+
+set -e
+[ -n "$LANCET_DEBUG" ] && set -x
+
+command="$1"
+case "$command" in
+  "") echo "Usage: lancet <command> [<args>]
+
+See 'lancet help <command>' for information on a specific command."
+  ;;
+esac

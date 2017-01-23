@@ -1,0 +1,54 @@
+#!/usr/bin/env bash
+
+set -e
+[ -n "$LANCET_DEBUG" ] && set -x
+
+if [[ -z "$1" ]]; then
+echo "NAME
+   lancet-status - Show the status of a progenitor/subset relationship
+
+SYNOPSIS
+   lancet status [<directory>]
+
+OPTIONS
+   <directory>
+      TODO"
+fi
+
+directory="$1"
+
+if [[ -z "$directory" ]]; then
+  directory=$(pwd)
+else
+  directory=$(realpath "$directory")
+fi
+
+if [[ ! -e "$directory" ]]; then
+  echo "lancet: $directory does not exist"
+  exit 1
+elif [[ -e "$directory" && ! -d "$directory" ]]; then
+  echo "lancet: $directory is not a directory"
+  exit 1
+fi
+
+if [[ -z "$(cat $directory/.git/lancet | grep ':')" ]]; then
+  # We're in a subset repository.
+  echo "Your subset is caught up to commit $(cat $directory/.git/lancet)
+in its progenitor"
+else
+  # We're in a progenitor repository.
+  while read -r line; do
+    cd $directory
+    subset_path="$(echo $line | cut -d : -f 1)"
+    last_merged_sha="$(echo $line | cut -d : -f 2)"
+
+    cd $subset_path
+    num_commits=$(($(git log --pretty=oneline $last_merged_sha..HEAD | wc -l)))
+
+    if [[ "$num_commits" == "0" ]]; then
+      echo "Up to date with subset at $subset_path"
+    else
+      echo "$num_commits commits behind subset at $subset_path"
+    fi
+  done <<< "$(cat $directory/.git/lancet)"
+fi

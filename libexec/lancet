@@ -1,0 +1,69 @@
+#!/usr/bin/env bash
+
+set -e
+
+if [[ "$1" = "--debug" ]]; then
+  export LANCET_DEBUG=1
+  shift
+fi
+
+if [[ -n "$LANCET_DEBUG" ]]; then
+  export PS4='+ [${BASH_SOURCE##*/}:${LINENO}] '
+  set -x
+fi
+
+resolve_link() {
+  $(type -p greadlink readlink | head -1) "$1"
+}
+
+abs_dirname() {
+  local cwd="$(pwd)"
+  local path="$1"
+
+  while [[ -n "$path" ]]; do
+    cd "${path%/*}"
+    local name="${path##*/}"
+    path="$(resolve_link "$name" || true)"
+  done
+
+  pwd
+  cd "$cwd"
+}
+
+libexec_path="$(abs_dirname "$0")"
+export _SUB_ROOT="$(abs_dirname "$libexec_path")"
+export PATH="${libexec_path}:$PATH"
+
+command="$1"
+case "$command" in
+"" | "-h" | "--help" )
+  command_path="$(command -v "lancet-help" || true)"
+  exec $command_path
+  ;;
+
+"help" )
+  shift
+  command="$1"
+  command_path="$(command -v "lancet-$command" || true)"
+  if [[ -z "$command_path" ]]; then
+    echo "lancet: no such command \`$command'" >&2
+    exit 1
+  fi
+  exec "$command_path"
+  ;;
+
+"-V" | "--version" )
+  exec lancet---version
+  ;;
+
+* )
+  command_path="$(command -v "lancet-$command" || true)"
+  if [[ -z "$command_path" ]]; then
+    echo "lancet: no such command \`$command'" >&2
+    exit 1
+  fi
+
+  shift 1
+  exec "$command_path" "$@"
+  ;;
+esac

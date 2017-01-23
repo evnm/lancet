@@ -1,0 +1,70 @@
+#!/usr/bin/env bash
+
+set -e
+[ -n "$LANCET_DEBUG" ] && set -x
+
+if [[ -z "$1" ]]; then
+echo "NAME
+   lancet-merge - Merge the history of a subset into its progenitor
+
+SYNOPSIS
+   lancet merge <subset-path> [<progenitor-path>]
+
+OPTIONS
+   <subset-path>
+      Path to a directory containing a Git repository which is a
+      subset of another. That is to say, a Git repository which was
+      created using $(tput bold)lancet clone$(tput sgr0).
+
+   <progenitor-path>
+      Path to a directory containing the Git repository from which
+      that within $(tput bold)<subset-path>$(tput sgr0) originated. That is to say, a Git
+      repository within which $(tput bold)lancet clone$(tput sgr0) was run to initially
+      produce the subset repository in $(tput bold)<subset-path>$(tput sgr0)."
+fi
+
+subset_path="$1"
+progenitor_path="$2"
+
+if [[ -z "$subset_path" ]]; then
+  echo "lancet: no subset path specified"
+  exit 1
+else
+  subset_path=$(realpath "$subset_path")
+fi
+
+if [[ -z "$progenitor_path" ]]; then
+  progenitor_path=$(pwd)
+else
+  progenitor_path=$(realpath "$progenitor_path")
+fi
+
+if [[ ! -e "$subset_path" ]]; then
+  echo "lancet: $subset_path does not exist"
+  exit 1
+elif [[ ! -e "$progenitor_path" ]]; then
+  echo "lancet: $progenitor_path does not exist"
+  exit 1
+elif [[ -e "$subset_path" && ! -d "$subset_path" ]]; then
+  echo "lancet: $subset_path is not a directory"
+  exit 1
+elif [[ -e "$progenitor_path" && ! -d "$progenitor_path" ]]; then
+  echo "lancet: $progenitor_path is not a directory"
+  exit 1
+fi
+
+# Produce patch files for the changes made to the subset repository.
+last_merged_sha=$(grep "$subset_path" .git/lancet | cut -d : -f 2)
+cd $subset_path
+git format-patch --quiet $last_merged_sha
+
+# Apply any patches to the progenitor repository.
+if [[ -n "$(compgen -G $subset_path/*.patch)" ]]; then
+  cd $progenitor_path
+  git am -p1 $subset_path/*.patch
+  rm $subset_path/*.patch
+
+  # Update the progenitor's lancet file.
+  echo $(grep -v "$subset_path" .git/lancet) > .git/lancet
+  echo "$subset_path:$(cd $subset_path && git rev-parse HEAD)" > .git/lancet
+fi
