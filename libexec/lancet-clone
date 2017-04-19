@@ -11,7 +11,7 @@ SYNOPSIS
    lancet clone <output-path> <pathspec>...
 
 OPTIONS
-   -o <output-path>
+   <output-path>
       Path to a directory in which a new Git repository will be
       created to house the cloned subset of the current repository.
 
@@ -30,8 +30,6 @@ fi
 
 output_path="$1"
 progenitor_path=$(pwd)
-
-
 
 if [[ -z "$output_path" ]]; then
   echo "lancet: no output path specified"
