@@ -47,7 +47,7 @@ fi
 shift
 mkdir -p $output_path
 for pathspec in "$@"; do
-  cp -r $pathspec $output_path
+  cp -R $pathspec $output_path
 done
 
 cd $output_path
